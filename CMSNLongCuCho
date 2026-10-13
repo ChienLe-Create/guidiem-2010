@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Thiệp Sinh Nhật ❤</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%; height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Arial', sans-serif;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        canvas {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1;
+        }
+
+        #lockScreen {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(20, 5, 15, 0.75);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 40px 60px;
+            border-radius: 25px;
+            border: 1px solid rgba(255, 179, 198, 0.3);
+            box-shadow: 0 0 80px rgba(255, 77, 109, 0.5);
+            z-index: 100;
+        }
+        #lockScreen h2 {
+            color: #ffb3c6;
+            margin-bottom: 25px;
+            font-size: 1.5rem;
+            font-weight: 300;
+            letter-spacing: 3px;
+            text-shadow: 0 0 20px rgba(255, 179, 198, 0.9);
+        }
+        #passwordInput {
+            padding: 15px 25px;
+            font-size: 1.3rem;
+            border: 2px solid rgba(255, 179, 198, 0.4);
+            border-radius: 12px;
+            outline: none;
+            width: 280px;
+            text-align: center;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.4);
+            letter-spacing: 4px;
+        }
+        #passwordInput::placeholder { color: rgba(255, 255, 255, 0.3); letter-spacing: 1px; }
+        #passwordInput:focus {
+            border-color: #ff4d6d;
+            box-shadow: 0 0 35px rgba(255, 77, 109, 0.9);
+        }
+        #unlockBtn {
+            display: block;
+            margin: 25px auto 0;
+            padding: 14px 55px;
+            font-size: 1.1rem;
+            background: linear-gradient(135deg, #ff4d6d, #b30000);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 0 25px rgba(255, 77, 109, 0.7);
+            font-weight: bold;
+            letter-spacing: 3px;
+        }
+        #unlockBtn:hover { transform: scale(1.05); }
+        #errorMsg {
+            color: #ff4d6d;
+            margin-top: 18px;
+            font-size: 0.95rem;
+            height: 22px;
+        }
+
+        #instruction {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ffb3c6;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            z-index: 10;
+            display: none;
+            text-shadow: 0 0 15px rgba(255, 77, 109, 0.9);
+            animation: pulse 2s infinite ease-in-out;
+            text-align: center;
+            padding: 0 20px;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        /* ĐÃ ĐIỀU CHỈNH: top từ 50% lên 30% để không đứng sát bánh */
+        #messageBox {
+            position: fixed;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            text-align: center;
+            z-index: 50;
+            pointer-events: none;
+            transition: transform 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #messageBox.show {
+            transform: translate(-50%, -50%) scale(1);
+        }
+        #messageBox h1 {
+            font-size: 3.5rem;
+            background: linear-gradient(90deg, #ffb3c6, #ff4d6d, #ffb3c6);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: bold;
+            letter-spacing: 4px;
+            filter: drop-shadow(0 0 20px rgba(255, 77, 109, 0.9));
+            animation: shimmer 3s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes shimmer { to { background-position: 200% center; } }
+
+        .floatHeart {
+            position: fixed;
+            pointer-events: none;
+            z-index: 5;
+            color: #ff4d6d;
+            font-size: 20px;
+            text-shadow: 0 0 15px #ff4d6d;
+            animation: floatUp 5s linear forwards;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh) scale(1.2) rotate(360deg); opacity: 0; }
+        }
+
+        #musicToggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 77, 109, 0.2);
+            border: 2px solid #ff4d6d;
+            color: #ffb3c6;
+            font-size: 1.4rem;
+            cursor: pointer;
+            z-index: 200;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(255, 77, 109, 0.8);
+            transition: all 0.3s;
+        }
+        #musicToggle:hover {
+            background: rgba(255, 77, 109, 0.6);
+            color: #fff;
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <!-- Nhạc chúc mừng sinh nhật: đặt tệp HappyBirthday.mp3 cùng thư mục -->
+    <audio id="bgMusic" src="HappyBirthday.mp3" loop preload="auto"></audio>
+    <button id="musicToggle">🔊</button>
+
+    <div id="lockScreen">
+        <h2>🔒 NHẬP MẬT KHẨU</h2>
+        <input type="text" id="passwordInput" placeholder="Ngày/Tháng..." autofocus>
+        <button id="unlockBtn">MỞ KHÓA</button>
+        <div id="errorMsg"></div>
+    </div>
+
+    <div id="instruction">🎯 Dùng cung bắn trúng trái tim hồng đang bay</div>
+
+    <div id="messageBox">
+        <h1>Chúc Mừng Sinh Nhật Vui Vẻ</h1>
+    </div>
+
+    <script>
+    // ============================================================
+    // THIỆP SINH NHẬT - BẮN CUNG VÀO TRÁI TIM + NHẠC
+    // NSMOD
+    // ============================================================
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let W, H;
+
+    let unlocked = false;
+    let gameState = 'aiming';
+    let heartHit = false;
+
+    const heart = {
+        x: 0, y: 0,
+        vx: 2,
+        vy: 0,
+        size: 60,
+        scale: 1,
+        hit: false
+    };
+
+    const bow = {
+        x: 0,
+        y: 0,
+        angle: -Math.PI / 2
+    };
+
+    const arrow = {
+        active: false,
+        x: 0, y: 0,
+        vx: 0, vy: 0,
+        angle: 0
+    };
+
+    const cake = {
+        x: 0, y: 0,
+        scale: 0,
+        targetScale: 0,
+        candles: [],
+        visible: false
+    };
+
+    const particles = [];
+
+    const bgMusic = document.getElementById('bgMusic');
+    const musicToggle = document.getElementById('musicToggle');
+    let isMusicPlaying = false;
+
+    function resizeCanvas() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+        bow.x = W / 2;
+        bow.y = H - 60;
+        if (gameState === 'aiming') {
+            heart.y = H * 0.35;
+            if (heart.x === 0) heart.x = W / 2;
+        }
+        if (cake.x === 0) {
+            cake.x = W / 2;
+            cake.y = H * 0.55;
+        }
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    function drawHeartShape(cx, cy, size, color, glow) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(size / 100, size / 100);
+
+        ctx.beginPath();
+        ctx.moveTo(0, 30);
+        ctx.bezierCurveTo(-50, -20, -50, -60, 0, -30);
+        ctx.bezierCurveTo(50, -60, 50, -20, 0, 30);
+        ctx.closePath();
+
+        const grad = ctx.createRadialGradient(0, -15, 5, 0, 0, 60);
+        grad.addColorStop(0, '#ffb3c6');
+        grad.addColorStop(0.5, '#ff4d6d');
+        grad.addColorStop(1, '#b30000');
+
+        ctx.fillStyle = grad;
+        if (glow) {
+            ctx.shadowColor = '#ff4d6d';
+            ctx.shadowBlur = 30;
+        }
+        ctx.fill();
+
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 15;
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function drawBow() {
+        ctx.save();
+        ctx.translate(bow.x, bow.y);
+        ctx.rotate(bow.angle + Math.PI / 2);
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 40, -Math.PI * 0.7, Math.PI * 0.7);
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.shadowColor = '#ff4d6d';
+        ctx.shadowBlur = 15;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(40 * Math.cos(-Math.PI * 0.7), 40 * Math.sin(-Math.PI * 0.7));
+        ctx.lineTo(40 * Math.cos(Math.PI * 0.7), 40 * Math.sin(Math.PI * 0.7));
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 0;
+        ctx.stroke();
+
+        if (gameState === 'aiming' && !arrow.active) {
+            ctx.beginPath();
+            ctx.moveTo(-60, 0);
+            ctx.lineTo(20, 0);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(20, 0);
+            ctx.lineTo(10, -6);
+            ctx.lineTo(10, 6);
+            ctx.closePath();
+            ctx.fillStyle = '#ff4d6d';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-60, 0);
+            ctx.lineTo(-70, -6);
+            ctx.moveTo(-60, 0);
+            ctx.lineTo(-70, 6);
+            ctx.strokeStyle = '#ffb3c6';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    function drawArrow() {
+        if (!arrow.active) return;
+        ctx.save();
+        ctx.translate(arrow.x, arrow.y);
+        ctx.rotate(arrow.angle);
+
+        ctx.beginPath();
+        ctx.moveTo(-40, 0);
+        ctx.lineTo(15, 0);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#fff';
+        ctx.shadowBlur = 10;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(15, 0);
+        ctx.lineTo(5, -7);
+        ctx.lineTo(5, 7);
+        ctx.closePath();
+        ctx.fillStyle = '#ff4d6d';
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    function drawCake() {
+        if (!cake.visible) return;
+        ctx.save();
+        ctx.translate(cake.x, cake.y);
+        ctx.scale(cake.scale, cake.scale);
+
+        const w = 200;
+        const h = 40;
+
+        ctx.fillStyle = '#ff69b4';
+        ctx.fillRect(-w/2, 0, w, h);
+        ctx.fillStyle = '#ffb3c6';
+        ctx.fillRect(-w/2, 0, w, 8);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-w/2, 0, w, h);
+
+        ctx.fillStyle = '#ff4d6d';
+        ctx.fillRect(-w/2 + 20, -h, w - 40, h);
+        ctx.fillStyle = '#ffb3c6';
+        ctx.fillRect(-w/2 + 20, -h, w - 40, 8);
+        ctx.strokeRect(-w/2 + 20, -h, w - 40, h);
+
+        for (let i = 0; i < 5; i++) {
+            const x = -w/2 + 30 + i * (w - 60) / 4;
+            ctx.beginPath();
+            ctx.arc(x, -h, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+        }
+
+        for (let i = 0; i < 3; i++) {
+            const cx = -40 + i * 40;
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(cx - 3, -h - 40, 6, 40);
+            const flicker = Math.sin(Date.now() * 0.01 + i) * 3;
+            ctx.beginPath();
+            ctx.ellipse(cx, -h - 45 + flicker, 5, 10, 0, 0, Math.PI * 2);
+            const flameGrad = ctx.createRadialGradient(cx, -h - 45, 0, cx, -h - 45, 10);
+            flameGrad.addColorStop(0, '#ffff00');
+            flameGrad.addColorStop(0.5, '#ff9900');
+            flameGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
+            ctx.fillStyle = flameGrad;
+            ctx.shadowColor = '#ff9900';
+            ctx.shadowBlur = 20;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        ctx.restore();
+    }
+
+    function drawParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.15;
+            p.life -= p.decay;
+            if (p.life <= 0) {
+                particles.splice(i, 1);
+                continue;
+            }
+            ctx.save();
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    function createFireworks(x, y) {
+        const colors = ['#ff4d6d', '#ffb3c6', '#ffd700', '#fff', '#ff69b4'];
+        for (let i = 0; i < 60; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2 + Math.random() * 6;
+            particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                size: 2 + Math.random() * 3,
+                life: 1,
+                decay: 0.01 + Math.random() * 0.02,
+                color: colors[Math.floor(Math.random() * colors.length)]
+            });
+        }
+    }
+
+    function playBirthdayMusic() {
+        bgMusic.volume = 0.7;
+        const playPromise = bgMusic.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                isMusicPlaying = true;
+                musicToggle.textContent = '🔊';
+                musicToggle.style.display = 'flex';
+            }).catch(error => {
+                console.log('Trình duyệt chặn tự động phát:', error);
+                musicToggle.textContent = '🔇';
+                musicToggle.style.display = 'flex';
+            });
+        }
+    }
+
+    musicToggle.addEventListener('click', () => {
+        if (isMusicPlaying) {
+            bgMusic.pause();
+            musicToggle.textContent = '🔇';
+            isMusicPlaying = false;
+        } else {
+            bgMusic.play();
+            musicToggle.textContent = '🔊';
+            isMusicPlaying = true;
+        }
+    });
+
+    function gameLoop() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.fillRect(0, 0, W, H);
+
+        if (Math.random() < 0.05) {
+            particles.push({
+                x: Math.random() * W,
+                y: Math.random() * H * 0.5,
+                vx: 0,
+                vy: 0,
+                size: 1,
+                life: 1,
+                decay: 0.005,
+                color: '#fff'
+            });
+        }
+
+        if (!heart.hit && gameState === 'aiming') {
+            heart.x += heart.vx;
+            if (heart.x < heart.size || heart.x > W - heart.size) {
+                heart.vx *= -1;
+            }
+            heart.y = H * 0.35 + Math.sin(Date.now() * 0.002) * 40;
+        }
+
+        if (arrow.active) {
+            arrow.x += arrow.vx;
+            arrow.y += arrow.vy;
+
+            if (!heart.hit && gameState === 'aiming') {
+                const dist = Math.hypot(arrow.x - heart.x, arrow.y - heart.y);
+                if (dist < heart.size * 0.6) {
+                    heart.hit = true;
+                    arrow.active = false;
+                    gameState = 'falling';
+                    createFireworks(heart.x, heart.y);
+
+                    for (let i = 0; i < 30; i++) {
+                        particles.push({
+                            x: heart.x,
+                            y: heart.y,
+                            vx: (Math.random() - 0.5) * 10,
+                            vy: (Math.random() - 0.5) * 10,
+                            size: 3 + Math.random() * 4,
+                            life: 1,
+                            decay: 0.02,
+                            color: '#ff4d6d'
+                        });
+                    }
+                }
+            }
+
+            if (arrow.x < -100 || arrow.x > W + 100 || arrow.y < -100 || arrow.y > H + 100) {
+                arrow.active = false;
+            }
+        }
+
+        if (gameState === 'falling') {
+            heart.y += 8;
+            heart.scale *= 0.98;
+            heart.x += (W/2 - heart.x) * 0.05;
+
+            if (heart.scale < 0.1) {
+                gameState = 'celebrating';
+                cake.visible = true;
+                cake.targetScale = 1;
+                setTimeout(() => {
+                    document.getElementById('messageBox').classList.add('show');
+                    createFireworks(W/2, H/2);
+                    playBirthdayMusic();
+                    setInterval(() => {
+                        createFireworks(
+                            W/2 + (Math.random() - 0.5) * W * 0.6,
+                            H/2 + (Math.random() - 0.5) * H * 0.4
+                        );
+                    }, 800);
+                }, 800);
+            }
+        }
+
+        if (cake.visible && cake.scale < cake.targetScale) {
+            cake.scale += 0.03;
+            if (cake.scale > cake.targetScale) cake.scale = cake.targetScale;
+        }
+
+        if (gameState === 'aiming' && !heart.hit) {
+            drawHeartShape(heart.x, heart.y, heart.size, '#ff4d6d', true);
+        }
+        if (heart.hit && gameState === 'falling') {
+            drawHeartShape(heart.x, heart.y, heart.size * heart.scale, '#ff4d6d', true);
+        }
+
+        drawBow();
+        drawArrow();
+        drawCake();
+        drawParticles();
+
+        requestAnimationFrame(gameLoop);
+    }
+    gameLoop();
+
+    function aimAndShoot(clientX, clientY) {
+        if (!unlocked || gameState !== 'aiming' || arrow.active || heart.hit) return;
+
+        const dx = clientX - bow.x;
+        const dy = clientY - bow.y;
+        const angle = Math.atan2(dy, dx);
+        bow.angle = angle;
+
+        const speed = 15;
+        arrow.active = true;
+        arrow.x = bow.x;
+        arrow.y = bow.y;
+        arrow.vx = Math.cos(angle) * speed;
+        arrow.vy = Math.sin(angle) * speed;
+        arrow.angle = angle;
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!unlocked || gameState !== 'aiming') return;
+        const dx = e.clientX - bow.x;
+        const dy = e.clientY - bow.y;
+        bow.angle = Math.atan2(dy, dx);
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+        aimAndShoot(e.clientX, e.clientY);
+    });
+
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        aimAndShoot(touch.clientX, touch.clientY);
+    }, {passive: false});
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!unlocked || gameState !== 'aiming') return;
+        const touch = e.touches[0];
+        const dx = touch.clientX - bow.x;
+        const dy = touch.clientY - bow.y;
+        bow.angle = Math.atan2(dy, dx);
+    }, {passive: false});
+
+    const MAT_KHAU = "13/10";
+    const lockScreen = document.getElementById('lockScreen');
+    const passwordInput = document.getElementById('passwordInput');
+    const unlockBtn = document.getElementById('unlockBtn');
+    const errorMsg = document.getElementById('errorMsg');
+    const instruction = document.getElementById('instruction');
+
+    function checkPassword() {
+        const input = passwordInput.value.trim().replace(/\s/g, '');
+        if (input === MAT_KHAU || input === "13-10" || input === "1310") {
+            unlocked = true;
+            lockScreen.style.transition = 'all 0.8s ease-out';
+            lockScreen.style.opacity = '0';
+            lockScreen.style.transform = 'translate(-50%, -50%) scale(1.3)';
+            setTimeout(() => {
+                lockScreen.style.display = 'none';
+                instruction.style.display = 'block';
+                heart.x = W / 2;
+                heart.y = H * 0.35;
+                heart.vx = 2.5;
+                heart.hit = false;
+                heart.scale = 1;
+                gameState = 'aiming';
+            }, 800);
+        } else {
+            errorMsg.textContent = "Sai mật khẩu! Gợi ý: Ngày/Tháng";
+            passwordInput.value = '';
+            passwordInput.focus();
+        }
+    }
+
+    unlockBtn.addEventListener('click', checkPassword);
+    passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') checkPassword();
+    });
+
+    function spawnFloatingHeart() {
+        const h = document.createElement('div');
+        h.className = 'floatHeart';
+        h.textContent = ['❤', '💖', '💕', '💗'][Math.floor(Math.random() * 4)];
+        h.style.left = Math.random() * 100 + 'vw';
+        h.style.bottom = '-30px';
+        h.style.fontSize = (15 + Math.random() * 20) + 'px';
+        h.style.animationDuration = (4 + Math.random() * 4) + 's';
+        document.body.appendChild(h);
+        setTimeout(() => h.remove(), 8000);
+    }
+    setInterval(spawnFloatingHeart, 500);
+    </script>
+</body>
+</html>
