@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSMOD - Pong Online P2P</title>
+    <style>
+        /* CSS co ban */
+        body {
+            margin: 0;
+            background: #111;
+            color: #0f0;
+            font-family: monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        #lobby {
+            text-align: center;
+        }
+        #lobby input, #lobby button {
+            font-family: monospace;
+            font-size: 16px;
+            padding: 8px;
+            margin: 5px;
+            background: #222;
+            color: #0f0;
+            border: 1px solid #0f0;
+        }
+        #lobby button:hover {
+            background: #0f0;
+            color: #111;
+            cursor: pointer;
+        }
+        #game-container {
+            display: none;
+            position: relative;
+        }
+        canvas {
+            border: 2px solid #0f0;
+            background: #000;
+        }
+        #status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #0f0;
+        }
+    </style>
+</head>
+<body>
+    <div id="lobby">
+        <h1>NSMOD PONG ONLINE</h1>
+        <p>Choi 2 nguoi qua Internet (P2P)</p>
+        <div>
+            <button id="btnCreate">Tao phong</button>
+            <input id="roomIdInput" placeholder="Nhap ID phong" />
+            <button id="btnJoin">Tham gia</button>
+        </div>
+        <div id="status">Chua ket noi</div>
+    </div>
+    <div id="game-container">
+        <canvas id="canvas" width="800" height="600"></canvas>
+    </div>
+
+    <!-- PeerJS CDN -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script>
+        // ============================================================
+        // GAME PONG ONLINE P2P SU DUNG PEERJS
+        // Tac gia: NSMOD
+        // Huong dan:
+        // 1. Mo file nay tren 2 may khac nhau (co Internet).
+        // 2. May 1: Bam "Tao phong" -> nhan duoc ID.
+        // 3. May 2: Nhap ID do vao o input, bam "Tham gia".
+        // 4. Choi: May 1 dung W/S, May 2 dung UP/DOWN.
+        // ============================================================
+
+        // Lay cac phan tu DOM
+        const lobby = document.getElementById('lobby');
+        const gameContainer = document.getElementById('game-container');
+        const statusDiv = document.getElementById('status');
+        const btnCreate = document.getElementById('btnCreate');
+        const btnJoin = document.getElementById('btnJoin');
+        const roomIdInput = document.getElementById('roomIdInput');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Kich thuoc game
+        const WIDTH = 800;
+        const HEIGHT = 600;
+        const PADDLE_W = 15;
+        const PADDLE_H = 100;
+        const BALL_SIZE = 15;
+
+        // Bien toan cuc
+        let peer = null;
+        let conn = null;
+        let isHost = false;
+        let gameRunning = false;
+
+        // Trang thai game
+        let ballX = WIDTH / 2;
+        let ballY = HEIGHT / 2;
+        let ballDX = 5;
+        let ballDY = 5;
+        let hostPaddleY = 250; // paddle trai (host)
+        let guestPaddleY = 250; // paddle phai (guest)
+        let scoreHost = 0;
+        let scoreGuest = 0;
+
+        // Dieu khien paddle cua ban than
+        let myPaddleY = 250;
+        let upPressed = false;
+        let downPressed = false;
+
+        // ==================== KHOI TAO PEER ====================
+        function initPeer(id) {
+            peer = new Peer(id, {
+                debug: 2
+            });
+
+            peer.on('open', (myId) => {
+                if (isHost) {
+                    statusDiv.textContent = 'Phong da tao. ID: ' + myId + ' - Cho nguoi choi khac...';
+                } else {
+                    statusDiv.textContent = 'Dang ket noi den phong...';
+                }
+            });
+
+            peer.on('error', (err) => {
+                statusDiv.textContent = 'Loi: ' + err.message;
+            });
+
+            // Host lang nghe ket noi
+            peer.on('connection', (connection) => {
+                if (!isHost) return;
+                if (conn) {
+                    connection.close();
+                    return;
+                }
+                conn = connection;
+                setupConnection();
+                statusDiv.textContent = 'Da co nguoi choi ket noi! Bat dau game.';
+                startGame();
+            });
+        }
+
+        // ==================== THIET LAP KET NOI ====================
+        function setupConnection() {
+            conn.on('open', () => {
+                // Gui trang thai ban dau
+                if (isHost) {
+                    sendGameState();
+                }
+            });
+
+            conn.on('data', (data) => {
+                if (isHost) {
+                    // Host nhan vi tri paddle cua guest
+                    if (data.type === 'paddle') {
+                        guestPaddleY = data.y;
+                    }
+                } else {
+                    // Guest nhan trang thai game tu host
+                    if (data.type === 'state') {
+                        ballX = data.ballX;
+                        ballY = data.ballY;
+                        hostPaddleY = data.hostPaddleY;
+                        guestPaddleY = data.guestPaddleY;
+                        scoreHost = data.scoreHost;
+                        scoreGuest = data.scoreGuest;
+                    }
+                }
+            });
+
+            conn.on('close', () => {
+                statusDiv.textContent = 'Ket noi da dong.';
+                gameRunning = false;
+            });
+        }
+
+        // ==================== GUI DU LIEU ====================
+        function sendGameState() {
+            if (!conn || !conn.open || !isHost) return;
+            conn.send({
+                type: 'state',
+                ballX: ballX,
+                ballY: ballY,
+                hostPaddleY: hostPaddleY,
+                guestPaddleY: guestPaddleY,
+                scoreHost: scoreHost,
+                scoreGuest: scoreGuest
+            });
+        }
+
+        function sendPaddle() {
+            if (!conn || !conn.open) return;
+            conn.send({
+                type: 'paddle',
+                y: myPaddleY
+            });
+        }
+
+        // ==================== VONG LAP GAME ====================
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            // Cap nhat paddle cua ban than
+            if (upPressed) myPaddleY -= 7;
+            if (downPressed) myPaddleY += 7;
+            myPaddleY = Math.max(0, Math.min(HEIGHT - PADDLE_H, myPaddleY));
+
+            if (isHost) {
+                // Host cap nhat paddle trai
+                hostPaddleY = myPaddleY;
+                // Host mo phong bong
+                ballX += ballDX;
+                ballY += ballDY;
+
+                // Va cham tuong tren duoi
+                if (ballY <= 0 || ballY >= HEIGHT - BALL_SIZE) {
+                    ballDY *= -1;
+                }
+
+                // Va cham paddle trai (host)
+                if (ballX <= 30 + PADDLE_W) {
+                    if (ballY + BALL_SIZE >= hostPaddleY && ballY <= hostPaddleY + PADDLE_H) {
+                        ballDX *= -1.05;
+                    } else if (ballX <= 0) {
+                        scoreGuest++;
+                        resetBall();
+                    }
+                }
+
+                // Va cham paddle phai (guest)
+                if (ballX >= WIDTH - 30 - PADDLE_W - BALL_SIZE) {
+                    if (ballY + BALL_SIZE >= guestPaddleY && ballY <= guestPaddleY + PADDLE_H) {
+                        ballDX *= -1.05;
+                    } else if (ballX >= WIDTH) {
+                        scoreHost++;
+                        resetBall();
+                    }
+                }
+
+                // Gui trang thai cho guest
+                sendGameState();
+            } else {
+                // Guest cap nhat paddle phai
+                guestPaddleY = myPaddleY;
+                // Gui vi tri paddle cho host
+                sendPaddle();
+            }
+
+            // Ve
+            draw();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resetBall() {
+            ballX = WIDTH / 2;
+            ballY = HEIGHT / 2;
+            ballDX = ballDX > 0 ? 5 : -5;
+            ballDY = 5;
+        }
+
+        function draw() {
+            // Xoa canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            // Duong giua
+            ctx.strokeStyle = '#333';
+            ctx.setLineDash([10, 10]);
+            ctx.beginPath();
+            ctx.moveTo(WIDTH / 2, 0);
+            ctx.lineTo(WIDTH / 2, HEIGHT);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Paddle trai (host)
+            ctx.fillStyle = '#0f0';
+            ctx.fillRect(30, hostPaddleY, PADDLE_W, PADDLE_H);
+
+            // Paddle phai (guest)
+            ctx.fillStyle = '#f44';
+            ctx.fillRect(WIDTH - 30 - PADDLE_W, guestPaddleY, PADDLE_W, PADDLE_H);
+
+            // Bong
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(ballX + BALL_SIZE/2, ballY + BALL_SIZE/2, BALL_SIZE/2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Diem
+            ctx.font = '36px monospace';
+            ctx.fillStyle = '#0f0';
+            ctx.fillText(scoreHost, WIDTH / 2 - 80, 50);
+            ctx.fillStyle = '#f44';
+            ctx.fillText(scoreGuest, WIDTH / 2 + 50, 50);
+        }
+
+        // ==================== BAT DAU GAME ====================
+        function startGame() {
+            lobby.style.display = 'none';
+            gameContainer.style.display = 'block';
+            gameRunning = true;
+            // Reset trang thai
+            ballX = WIDTH / 2;
+            ballY = HEIGHT / 2;
+            ballDX = 5;
+            ballDY = 5;
+            hostPaddleY = 250;
+            guestPaddleY = 250;
+            scoreHost = 0;
+            scoreGuest = 0;
+            myPaddleY = 250;
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ==================== SU KIEN BAN PHIM ====================
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'w' || e.key === 'W') upPressed = true;
+            if (e.key === 's' || e.key === 'S') downPressed = true;
+            if (e.key === 'ArrowUp') upPressed = true;
+            if (e.key === 'ArrowDown') downPressed = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'w' || e.key === 'W') upPressed = false;
+            if (e.key === 's' || e.key === 'S') downPressed = false;
+            if (e.key === 'ArrowUp') upPressed = false;
+            if (e.key === 'ArrowDown') downPressed = false;
+        });
+
+        // ==================== SU KIEN LOBBY ====================
+        btnCreate.addEventListener('click', () => {
+            isHost = true;
+            // Tao ID ngau nhien
+            const randomId = 'nsmod-' + Math.random().toString(36).substr(2, 6);
+            initPeer(randomId);
+        });
+
+        btnJoin.addEventListener('click', () => {
+            const id = roomIdInput.value.trim();
+            if (!id) {
+                statusDiv.textContent = 'Vui long nhap ID phong.';
+                return;
+            }
+            isHost = false;
+            initPeer(); // Tao peer an danh
+            peer.on('open', () => {
+                conn = peer.connect(id);
+                setupConnection();
+                conn.on('open', () => {
+                    statusDiv.textContent = 'Da ket noi! Bat dau game.';
+                    startGame();
+                });
+            });
+        });
+    </script>
+</body>
+</html>
